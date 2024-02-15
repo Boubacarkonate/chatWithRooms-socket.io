@@ -19,8 +19,8 @@
             </div>
         </div>
         <div id="isWritting"></div>
-        <form method="post" id="chatForm">
-            <input type="text" name="" id="msgInput" autofocus>
+        <form  method="post" id="chatForm">
+            <input type="text" name="" id="msgInput" autofocus onkeypress="writting()"  onblur="notWritting()">
             <input type="submit" value="Envoyer" id="btnSend">
         </form>
     </div>

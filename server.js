@@ -29,6 +29,37 @@ app.use(function (req, res, next) {
 // IO
 // Importation du module Socket.IO et initialisation de l'écouteur de sockets sur le serveur HTTP
 let io = require('socket.io')(server);
+io.on('connection', function (socket) {
+
+//ce code permet au serveur de recevoir le pseudo d'un client, de l'assigner à la propriété pseudo du socket, puis d'informer tous les autres clients de l'arrivée de ce nouvel utilisateur en émettant un événement 'newUser' avec le pseudo correspondant.
+    socket.on('pseudo', function (pseudo) {
+        socket.pseudo = pseudo;
+        socket.broadcast.emit('newUser', pseudo);
+    });
+
+
+//emettre le message à tous les utilisateurs connectés
+    socket.on('newMessage', (message) => {
+        socket.broadcast.emit('newMessageAll', {message: message, pseudo: socket.pseudo});
+    });
+
+
+    socket.on('writting', (pseudo) => {
+        socket.broadcast.emit('writting', pseudo)
+    });
+
+
+    socket.on('notWritting', () => {
+        socket.broadcast.emit('notWritting')
+    });
+
+
+
+//ce code permet au serveur de détecter lorsque qu'un client se déconnecte et d'informer les autres clients de cette déconnexion en émettant un événement 'quitUser' avec le pseudo de l'utilisateur qui se déconnecte
+    socket.on('disconnect', () => {
+        socket.broadcast.emit('quitUser', socket.pseudo);
+    })
+});
 
 // Démarre le serveur HTTP sur le port 8080
 server.listen(8080, () => console.log('!!!! server started port: 8080 !!!!'));
