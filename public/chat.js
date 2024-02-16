@@ -43,32 +43,56 @@ Lorsqu'un nouvel utilisateur rejoint le chat, cet événement est écouté côt�
 événement est reçu, la fonction createElementFunction est appelée pour créer un élément HTML représentant l'arrivée 
 de ce nouvel utilisateur.
 */
-socket.on('newUser', (pseudo) => {
 
-        createElementFunction('newUser', pseudo);
+
+
+// Écouteur d'événement pour l'arrivée d'un nouvel utilisateur déclenché lorsque le serveur émet l'événement 'newUser' avec le pseudo de nouvel utilisateur.
+socket.on('newUser', (pseudo) => {
+    // Lorsqu'un nouvel utilisateur rejoint le chat, cette fonction est appelée
+    // Elle crée un nouvel élément HTML pour afficher l'arrivée de ce nouvel utilisateur
+    createElementFunction('newUser', pseudo);
 });
 
-
+// Écouteur d'événement pour la réception d'un nouveau message déclenché lorsque le serveur émet l'événement 'newMessageAll' avec le contenu du message.
 socket.on('newMessageAll', (content) => {
-
+    // Lorsqu'un nouveau message est reçu, cette fonction est appelée
+    // Elle crée un nouvel élément HTML pour afficher le message dans l'interface utilisateur
     createElementFunction('newMessageAll', content);
 });
 
 
+socket.on('oldMessages', (messages) => {
+    messages.forEach(msg => {
+        if (msg.sender === pseudo) {
+            createElementFunction('oldMessagesMe', msg);
+            console.log('message visible');
+        } else {
+            createElementFunction('oldMessages', msg);
+            console.log('msg non visible');
+        }
+    });
+});
+
+// Écouteur d'événement déclenché lorsque le serveur émet l'événement 'writting' avec le pseudo de l'utilisateur qui est en train d'écrire.
 socket.on('writting', (pseudo) => {
+    // Lorsque le serveur émet l'événement 'writting', cette fonction est appelée
+    // Elle met à jour l'élément HTML avec l'ID 'isWritting' pour afficher que l'utilisateur est en train d'écrire
     document.getElementById('isWritting').textContent = pseudo + " est en train d'écrire";
 });
 
-
+// Écouteur d'événement pour indiquer qu'un utilisateur a cessé d'écrire. Il est déclenché lorsque le serveur émet l'événement 'notWritting'.
 socket.on('notWritting', () => {
+    // Lorsque le serveur émet l'événement 'notWritting', cette fonction est appelée
+    // Elle efface le texte indiquant que l'utilisateur est en train d'écrire de l'élément HTML avec l'ID 'isWritting'
     document.getElementById('isWritting').textContent = '';
 });
 
-
+// Écouteur d'événement déclenché lorsque le serveur émet l'événement 'quitUser' avec le pseudo de l'utilisateur qui quitte le chat.
 socket.on('quitUser', (pseudo) => {
-
+    // Lorsqu'un utilisateur quitte le chat, cette fonction est appelée
+    // Elle crée un nouvel élément HTML pour afficher le départ de cet utilisateur dans l'interface utilisateur
     createElementFunction('quitUser', pseudo);
-})
+});
 
 
                             //funtion
@@ -109,6 +133,18 @@ function createElementFunction(element, content){
                 newElement.classList.add(element, 'message')
                 newElement.innerHTML = content.pseudo + ' : ' + content.message;
                 document.getElementById('msgContainer').appendChild(newElement);
+            break;
+
+        case 'oldMessages':
+                newElement.classList.add(element, 'message');
+                newElement.innerHTML = content.sender + ': ' + content.content;
+                document.getElementById('msgContainer').appendChild(newElement);
+            break;
+
+            case 'oldMessagesMe':
+                newElement.classList.add('newMessageMe', 'message');
+                newElement.innerHTML = content.sender + ': ' + content.content;
+                document.getElementById('msgContainer').appendChild(newElement);ld(newElement);
             break;
 
         case 'quitUser':

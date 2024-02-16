@@ -8,7 +8,26 @@ let app = express();
 let server = require('http').createServer(app);
 
 // Importation du module Mongoose, qui est un outil de modélisation d'objets MongoDB pour Node.js
-let mongoose = require('mongoose');
+const mongoose = require('mongoose');
+
+// Connexion à la base de données MongoDB avec Mongoose
+mongoose.connect('mongodb://localhost:27017/ChatSocket')
+  .then(() => {
+    console.log('*****Connexion à la base de données MongoDB réussie.*******');
+    // Placez ici le code à exécuter après la connexion réussie
+  })
+  .catch((error) => {
+    console.error('Erreur lors de la connexion à la base de données MongoDB :', error);
+  });
+
+//importation des modèles de données et les schemas
+require('./models/chat.model');
+require('./models/room.model');
+require('./models/user.model')
+//définir des variables comportant les modèles de données définis avec Mongoose. Ces modèles sont utilisés pour interagir avec la base de données MongoDB.
+let User = mongoose.model('user');
+let Room = mongoose.model('room');
+let Chat = mongoose.model('chat');
 
 // Utilisation du middleware express.static pour servir les fichiers statiques à partir du répertoire '/public' situé dans le répertoire actuel (__dirname)
 // Cela signifie que les fichiers HTML, CSS, JavaScript, etc., contenus dans ce répertoire seront accessibles à partir de l'URL racine de votre serveur (par exemple, http://localhost:8080/)
@@ -32,23 +51,52 @@ let io = require('socket.io')(server);
 io.on('connection', function (socket) {
 
 //ce code permet au serveur de recevoir le pseudo d'un client, de l'assigner à la propriété pseudo du socket, puis d'informer tous les autres clients de l'arrivée de ce nouvel utilisateur en émettant un événement 'newUser' avec le pseudo correspondant.
-    socket.on('pseudo', function (pseudo) {
-        socket.pseudo = pseudo;
-        socket.broadcast.emit('newUser', pseudo);
+socket.on('pseudo', async function (pseudo) {
+    try {
+        let user = await User.findOne({ pseudo: pseudo });
+        if (user) {
+            socket.pseudo = pseudo;
+            socket.broadcast.emit('newUser', pseudo);
+        } else {
+            let newUser = new User({ pseudo: pseudo });
+            await newUser.save();
+            socket.pseudo = pseudo;
+            socket.broadcast.emit('newUser', pseudo);
+        }
+    } catch (error) {
+        console.error('Erreur lors de la recherche ou de la sauvegarde de l\'utilisateur :', error);
+    }
+
+    socket.on('oldMessages', async function () {
+        try {
+            let messages = await Chat.find();
+            socket.emit('oldMessages', messages, socket.pseudo);
+        } catch (error) {
+            console.error('Erreur lors de la récupération des anciens messages :', error);
+        }
     });
+    
+});
 
 
 //emettre le message à tous les utilisateurs connectés
     socket.on('newMessage', (message) => {
+        let chatMessage = new Chat();
+        chatMessage.content = message;
+        chatMessage.sender = socket.pseudo;
+        chatMessage.save();
+
         socket.broadcast.emit('newMessageAll', {message: message, pseudo: socket.pseudo});
     });
 
 
+// Écouteur d'événement pour indiquer qu'un utilisateur est en train d'écrire
     socket.on('writting', (pseudo) => {
         socket.broadcast.emit('writting', pseudo)
     });
 
 
+// Écouteur d'événement pour indiquer qu'un utilisateur a cessé d'écrire    
     socket.on('notWritting', () => {
         socket.broadcast.emit('notWritting')
     });
