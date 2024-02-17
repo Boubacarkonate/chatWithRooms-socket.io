@@ -62,12 +62,12 @@ socket.on('newMessageAll', (content) => {
 
 
 socket.on('oldMessages', (messages) => {
-    messages.forEach(msg => {
-        if (msg.sender === pseudo) {
-            createElementFunction('oldMessagesMe', msg);
+    messages.forEach(message => {
+        if (message.sender === pseudo) {
+            createElementFunction('oldMessagesMe', message); // Ajout d'une virgule entre 'oldMessagesMe' et msg
             console.log('message visible');
         } else {
-            createElementFunction('oldMessages', msg);
+            createElementFunction('oldMessages', message); // Ajout d'une virgule entre 'oldMessages' et msg
             console.log('msg non visible');
         }
     });
@@ -144,7 +144,7 @@ function createElementFunction(element, content){
             case 'oldMessagesMe':
                 newElement.classList.add('newMessageMe', 'message');
                 newElement.innerHTML = content.sender + ': ' + content.content;
-                document.getElementById('msgContainer').appendChild(newElement);ld(newElement);
+                document.getElementById('msgContainer').appendChild(newElement);
             break;
 
         case 'quitUser':

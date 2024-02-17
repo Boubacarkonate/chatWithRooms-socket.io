@@ -51,9 +51,9 @@ let io = require('socket.io')(server);
 io.on('connection', function (socket) {
 
 //ce code permet au serveur de recevoir le pseudo d'un client, de l'assigner à la propriété pseudo du socket, puis d'informer tous les autres clients de l'arrivée de ce nouvel utilisateur en émettant un événement 'newUser' avec le pseudo correspondant.
-socket.on('pseudo', async function (pseudo) {
+socket.on('pseudo', async (pseudo) => {
     try {
-        let user = await User.findOne({ pseudo: pseudo });
+        let user = await User.findOne({ pseudo: pseudo }).exec();
         if (user) {
             socket.pseudo = pseudo;
             socket.broadcast.emit('newUser', pseudo);
@@ -63,19 +63,12 @@ socket.on('pseudo', async function (pseudo) {
             socket.pseudo = pseudo;
             socket.broadcast.emit('newUser', pseudo);
         }
+
+        let messages = await Chat.find().exec();
+        socket.emit('oldMessages', messages);
     } catch (error) {
         console.error('Erreur lors de la recherche ou de la sauvegarde de l\'utilisateur :', error);
     }
-
-    socket.on('oldMessages', async function () {
-        try {
-            let messages = await Chat.find();
-            socket.emit('oldMessages', messages, socket.pseudo);
-        } catch (error) {
-            console.error('Erreur lors de la récupération des anciens messages :', error);
-        }
-    });
-    
 });
 
 
