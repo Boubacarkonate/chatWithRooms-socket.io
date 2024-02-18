@@ -21,6 +21,12 @@
         <div id="isWritting"></div>
         <form  method="post" id="chatForm">
             <input type="text" name="" id="msgInput" autofocus onkeypress="writting()"  onblur="notWritting()">
+            <select name="receiver" id="receiverInput">
+                <option value="all">à tous</option>
+                <% users.forEach(user => { %>
+                    <option value="<%= user.pseudo %>"><%= user.pseudo %></option>
+                <% }) %>
+            </select>
             <input type="submit" value="Envoyer" id="btnSend">
         </form>
     </div>

@@ -13,6 +13,8 @@ console.log('Pseudo choisi :', pseudo); // Affichage du pseudo choisi dans la co
 // Envoi du pseudo au serveur via Socket.IO
 socket.emit('pseudo', pseudo);
 
+socket.emit('oldWhispers', pseudo);
+
 // Mise à jour du titre du document pour inclure le pseudo choisi
 document.title = pseudo + ' - ' + document.title;
 
@@ -25,10 +27,15 @@ console.log('formulaire ok');
     const textInput = document.getElementById('msgInput').value;
     document.getElementById('msgInput').value = '';
 
+    const receiver = document.getElementById('receiverInput').value;
+
     if (textInput.length > 0) {
-        socket.emit('newMessage', textInput);
-        createElementFunction('newMessageMe', textInput);
-        console.log('message envoyé');
+        socket.emit('newMessage', textInput, receiver);
+        if (receiver === 'all') {
+            createElementFunction('newMessageMe', textInput);
+            console.log('message envoyé');
+        }
+        
     } else {
         return false;
     }
@@ -53,11 +60,30 @@ socket.on('newUser', (pseudo) => {
     createElementFunction('newUser', pseudo);
 });
 
+
+socket.on('newUserInDb', (pseudo) => {
+    newOptions = document.createElement('option');
+    newOptions.textContent = pseudo;
+    newOptions.value = pseudo;
+    document.getElementById('receiverInput').appendChild(newOptions);
+});
+
+
+socket.on('oldWhispers', (messages) => {
+    messages.forEach((message) => {
+        createElementFunction('oldWhispers', message);
+    });
+})
+
 // Écouteur d'événement pour la réception d'un nouveau message déclenché lorsque le serveur émet l'événement 'newMessageAll' avec le contenu du message.
 socket.on('newMessageAll', (content) => {
     // Lorsqu'un nouveau message est reçu, cette fonction est appelée
     // Elle crée un nouvel élément HTML pour afficher le message dans l'interface utilisateur
     createElementFunction('newMessageAll', content);
+});
+
+socket.on('whisper', (content) => {
+    createElementFunction('whisper', content);
 });
 
 
@@ -135,6 +161,12 @@ function createElementFunction(element, content){
                 document.getElementById('msgContainer').appendChild(newElement);
             break;
 
+        case 'whisper':
+                newElement.classList.add(element, 'message')
+                newElement.innerHTML = content.sender + ' vous a chuchoté : ' + content.message;
+                document.getElementById('msgContainer').appendChild(newElement);
+            break;
+
         case 'oldMessages':
                 newElement.classList.add(element, 'message');
                 newElement.innerHTML = content.sender + ': ' + content.content;
@@ -144,6 +176,12 @@ function createElementFunction(element, content){
             case 'oldMessagesMe':
                 newElement.classList.add('newMessageMe', 'message');
                 newElement.innerHTML = content.sender + ': ' + content.content;
+                document.getElementById('msgContainer').appendChild(newElement);
+            break;
+
+        case 'oldWhispers':
+                newElement.classList.add(element, 'message');
+                newElement.innerHTML = content.sender + ' vous a chuchoté : ' + content.content;
                 document.getElementById('msgContainer').appendChild(newElement);
             break;
 

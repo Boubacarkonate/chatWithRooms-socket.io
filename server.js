@@ -36,8 +36,15 @@ app.use(express.static(__dirname + '/public'));
 // ROUTER
 // Définition d'une route pour l'URL racine '/' qui rend le fichier 'index.ejs'
 app.get('/', function (req, res) {
-    res.render('index.ejs');
-})
+User.find()
+    .then(users => {
+        res.render('index.ejs', {users: users});
+    })
+    .catch(err => {
+        console.error('Erreur lors de la recherche des utilisateurs :', err);
+        res.status(500).send('Erreur lors de la recherche des utilisateurs');
+    });
+});
 
 // Middleware pour gérer les requêtes non trouvées (404)
 app.use(function (req, res, next) {
@@ -48,6 +55,9 @@ app.use(function (req, res, next) {
 // IO
 // Importation du module Socket.IO et initialisation de l'écouteur de sockets sur le serveur HTTP
 let io = require('socket.io')(server);
+let connectedUsers = [];
+
+
 io.on('connection', function (socket) {
 
 //ce code permet au serveur de recevoir le pseudo d'un client, de l'assigner à la propriété pseudo du socket, puis d'informer tous les autres clients de l'arrivée de ce nouvel utilisateur en émettant un événement 'newUser' avec le pseudo correspondant.
@@ -62,9 +72,12 @@ socket.on('pseudo', async (pseudo) => {
             await newUser.save();
             socket.pseudo = pseudo;
             socket.broadcast.emit('newUser', pseudo);
+            socket.broadcast.emit('newUserInDb', pseudo);
         }
 
-        let messages = await Chat.find().exec();
+        connectedUsers.push(socket);
+
+        let messages = await Chat.find({ receiver: 'all' }).exec();
         socket.emit('oldMessages', messages);
     } catch (error) {
         console.error('Erreur lors de la recherche ou de la sauvegarde de l\'utilisateur :', error);
@@ -72,15 +85,52 @@ socket.on('pseudo', async (pseudo) => {
 });
 
 
-//emettre le message à tous les utilisateurs connectés
-    socket.on('newMessage', (message) => {
-        let chatMessage = new Chat();
-        chatMessage.content = message;
-        chatMessage.sender = socket.pseudo;
-        chatMessage.save();
+socket.on('oldWhispers', async (pseudo) => {
+    try {
+        let oldPrivateMessages = await Chat.find({ receiver: pseudo }).exec();
+        socket.emit('oldWhispers', oldPrivateMessages);
+    } catch (error) {
+        console.error('Erreur lors de la récupération des messages privés :', error);
+    }
+});
 
-        socket.broadcast.emit('newMessageAll', {message: message, pseudo: socket.pseudo});
-    });
+
+
+//emettre le message à tous les utilisateurs connectés
+socket.on('newMessage', async (message, receiver) => {
+    try {
+        if (receiver === 'all') {
+            let chatMessage = new Chat();
+            chatMessage.content = message;
+            chatMessage.sender = socket.pseudo;
+            chatMessage.receiver = 'all';   
+            await chatMessage.save();
+
+            socket.broadcast.emit('newMessageAll', { message: message, pseudo: socket.pseudo });
+        } else {
+            let user = await User.findOne({ pseudo: receiver }).exec();
+            if (!user) {
+                // Si l'utilisateur destinataire n'existe pas, renvoyer une erreur
+                console.error('L\'utilisateur destinataire n\'existe pas');
+                return;
+            }
+
+            let socketReceiver = connectedUsers.find(socket => socket.pseudo === receiver);
+            if (socketReceiver) {
+                socketReceiver.emit('whisper', { sender: socket.pseudo, message: message });
+            }
+
+            let chatMessage = new Chat();
+            chatMessage.content = message;
+            chatMessage.sender = socket.pseudo;
+            chatMessage.receiver = receiver;
+            await chatMessage.save();
+        }
+    } catch (error) {
+        console.error('Une erreur est survenue lors de l\'envoi du message :', error);
+    }
+});
+
 
 
 // Écouteur d'événement pour indiquer qu'un utilisateur est en train d'écrire
@@ -98,6 +148,10 @@ socket.on('pseudo', async (pseudo) => {
 
 //ce code permet au serveur de détecter lorsque qu'un client se déconnecte et d'informer les autres clients de cette déconnexion en émettant un événement 'quitUser' avec le pseudo de l'utilisateur qui se déconnecte
     socket.on('disconnect', () => {
+        let index = connectedUsers.indexOf(socket);
+        if (index > -1) {
+            connectedUsers.splice(index, 1);
+        }
         socket.broadcast.emit('quitUser', socket.pseudo);
     })
 });
