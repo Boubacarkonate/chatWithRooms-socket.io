@@ -1,36 +1,63 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="fr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chat</title>
     <link rel="stylesheet" href="style.css">
+    <title>Chat</title>
 </head>
 <body>
+
     <div class="app">
-        <h1 class="chatTitle">Bienvenue sur le chat</h1>
+        <h1 class="chatTitle">Bienvenue sur chat</h1>
+
 
         <div class="container">
             <div class="channelList">
                 <h1>Liste des channels</h1>
+                <ul id="roomList">
+                    <% channels.forEach(channel => { %>
+                    <li onclick="_joinRoom('<%=channel.name%>')" class="elementList" id="<%=channel.name%>"><%= channel.name %></li>
+                    <% }); %>
+                    <li onclick="_createRoom()" class="elementList" id="createNewRoom">Creer une nouvelle room</li>
+                </ul>
             </div>
-            <div class="msgContainer" id="msgContainer">
-
-            </div>
+    
+            <div class="msgContainer" id="msgContainer"></div>
         </div>
+        
         <div id="isWritting"></div>
-        <form  method="post" id="chatForm">
-            <input type="text" name="" id="msgInput" autofocus onkeypress="writting()"  onblur="notWritting()">
+        <form action="/chat" method="POST" id="chatForm">
+            <input type="text" id="msgInput" onkeypress="writting()" onblur="notWritting()" autofocus>
             <select name="receiver" id="receiverInput">
-                <option value="all">à tous</option>
+                <option value="all">A tous</option>
                 <% users.forEach(user => { %>
                     <option value="<%= user.pseudo %>"><%= user.pseudo %></option>
-                <% }) %>
+                <% }); %>
             </select>
-            <input type="submit" value="Envoyer" id="btnSend">
+            <input type="submit" id="btnSend" value="Envoyer">
         </form>
+
     </div>
+
     <script src="/socket.io/socket.io.js"></script>
     <script src="chat.js"></script>
 </body>
 </html>
+
+
+<!--
+
+function createChannel(newRoom) {
+    // Vérifie si la room existe déjà dans la liste
+    if (!document.getElementById(newRoom)) {
+        const newRoomItem = document.createElement("li");
+        newRoomItem.classList.add('elementList');
+        newRoomItem.id = newRoom;
+        newRoomItem.textContent = newRoom;
+        newRoomItem.setAttribute('onclick', "_joinRoom('" + newRoom + "')");
+        document.getElementById('roomList').insertBefore(newRoomItem, document.getElementById('createNewRoom'));
+    }
+}
+
+-->

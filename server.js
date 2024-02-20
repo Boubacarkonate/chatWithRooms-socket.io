@@ -1,3 +1,5 @@
+//ESSSSAIE
+
 // Importation du module Express, qui est un framework web pour Node.js
 let express = require('express');
 
@@ -36,15 +38,23 @@ app.use(express.static(__dirname + '/public'));
 // ROUTER
 // Définition d'une route pour l'URL racine '/' qui rend le fichier 'index.ejs'
 app.get('/', function (req, res) {
-User.find()
-    .then(users => {
-        res.render('index.ejs', {users: users});
-    })
-    .catch(err => {
-        console.error('Erreur lors de la recherche des utilisateurs :', err);
-        res.status(500).send('Erreur lors de la recherche des utilisateurs');
-    });
+    User.find()
+        .then(users => {
+            Room.find()
+                .then(rooms => {
+                    res.render('index.ejs', { users: users, channels: rooms });
+                })
+                .catch(err => {
+                    console.error('Erreur lors de la recherche des canaux :', err);
+                    res.status(500).send('Erreur lors de la recherche des canaux');
+                });
+        })
+        .catch(err => {
+            console.error('Erreur lors de la recherche des utilisateurs :', err);
+            res.status(500).send('Erreur lors de la recherche des utilisateurs');
+        });
 });
+
 
 // Middleware pour gérer les requêtes non trouvées (404)
 app.use(function (req, res, next) {
@@ -58,27 +68,36 @@ let io = require('socket.io')(server);
 let connectedUsers = [];
 
 
-io.on('connection', function (socket) {
-
-//ce code permet au serveur de recevoir le pseudo d'un client, de l'assigner à la propriété pseudo du socket, puis d'informer tous les autres clients de l'arrivée de ce nouvel utilisateur en émettant un événement 'newUser' avec le pseudo correspondant.
+// Lorsqu'une personne arrive sur la vue index.ejs, la fonction ci-dessous se lance
+io.on('connection', (socket) => {
+    
+  // On recoit 'pseudo' du fichier html
 socket.on('pseudo', async (pseudo) => {
     try {
         let user = await User.findOne({ pseudo: pseudo }).exec();
         if (user) {
+            // L'utilisateur existe déjà dans la base de données
+            // On join automatiquement le channel "salon1" par défaut
+            _joinRoom("salon1");
+
+            // On conserve le pseudo dans la variable socket qui est propre à chaque utilisateur
             socket.pseudo = pseudo;
-            socket.broadcast.emit('newUser', pseudo);
+            connectedUsers.push(socket);
+            // On previent les autres
+            socket.broadcast.to(socket.channel).emit('newUser', pseudo);
         } else {
+            // L'utilisateur n'existe pas dans la base de données, on le crée
             let newUser = new User({ pseudo: pseudo });
             await newUser.save();
+
+            // On join automatiquement le channel "salon1" par défaut
+            _joinRoom("salon1");
+
             socket.pseudo = pseudo;
-            socket.broadcast.emit('newUser', pseudo);
+            connectedUsers.push(socket)
+            socket.broadcast.to(socket.channel).emit('newUser', pseudo);
             socket.broadcast.emit('newUserInDb', pseudo);
         }
-
-        connectedUsers.push(socket);
-
-        let messages = await Chat.find({ receiver: 'all' }).exec();
-        socket.emit('oldMessages', messages);
     } catch (error) {
         console.error('Erreur lors de la recherche ou de la sauvegarde de l\'utilisateur :', error);
     }
@@ -87,74 +106,113 @@ socket.on('pseudo', async (pseudo) => {
 
 socket.on('oldWhispers', async (pseudo) => {
     try {
-        let oldPrivateMessages = await Chat.find({ receiver: pseudo }).exec();
-        socket.emit('oldWhispers', oldPrivateMessages);
-    } catch (error) {
-        console.error('Erreur lors de la récupération des messages privés :', error);
-    }
-});
-
-
-
-//emettre le message à tous les utilisateurs connectés
-socket.on('newMessage', async (message, receiver) => {
-    try {
-        if (receiver === 'all') {
-            let chatMessage = new Chat();
-            chatMessage.content = message;
-            chatMessage.sender = socket.pseudo;
-            chatMessage.receiver = 'all';   
-            await chatMessage.save();
-
-            socket.broadcast.emit('newMessageAll', { message: message, pseudo: socket.pseudo });
+        let messages = await Chat.find({ receiver: pseudo }).exec();
+        if (messages && messages.length > 0) {
+            socket.emit('oldWhispers', messages);
         } else {
-            let user = await User.findOne({ pseudo: receiver }).exec();
-            if (!user) {
-                // Si l'utilisateur destinataire n'existe pas, renvoyer une erreur
-                console.error('L\'utilisateur destinataire n\'existe pas');
-                return;
-            }
-
-            let socketReceiver = connectedUsers.find(socket => socket.pseudo === receiver);
-            if (socketReceiver) {
-                socketReceiver.emit('whisper', { sender: socket.pseudo, message: message });
-            }
-
-            let chatMessage = new Chat();
-            chatMessage.content = message;
-            chatMessage.sender = socket.pseudo;
-            chatMessage.receiver = receiver;
-            await chatMessage.save();
+            // Aucun message trouvé ou une erreur s'est produite
+            console.log('Aucun message trouvé pour', pseudo);
         }
     } catch (error) {
-        console.error('Une erreur est survenue lors de l\'envoi du message :', error);
+        console.error('Erreur lors de la recherche des anciens chuchotements pour', pseudo, ':', error);
     }
 });
 
-
-
-// Écouteur d'événement pour indiquer qu'un utilisateur est en train d'écrire
-    socket.on('writting', (pseudo) => {
-        socket.broadcast.emit('writting', pseudo)
+    socket.on('changeChannel', (channel) => {
+        _joinRoom(channel);
     });
 
-
-// Écouteur d'événement pour indiquer qu'un utilisateur a cessé d'écrire    
-    socket.on('notWritting', () => {
-        socket.broadcast.emit('notWritting')
-    });
-
-
-
-//ce code permet au serveur de détecter lorsque qu'un client se déconnecte et d'informer les autres clients de cette déconnexion en émettant un événement 'quitUser' avec le pseudo de l'utilisateur qui se déconnecte
-    socket.on('disconnect', () => {
-        let index = connectedUsers.indexOf(socket);
-        if (index > -1) {
-            connectedUsers.splice(index, 1);
+    socket.on('newMessage', async (message, receiver) => {
+        try {
+            if (receiver === "all") {
+                var chat = new Chat();
+                chat._id_room = socket.channel;
+                chat.sender = socket.pseudo;
+                chat.receiver = receiver;
+                chat.content = message;
+                await chat.save();
+                socket.broadcast.to(socket.channel).emit('newMessageAll', { message: message, pseudo: socket.pseudo });
+            } else {
+                let user = await User.findOne({ pseudo: receiver }).exec();
+                if (!user) {
+                    console.log('Utilisateur non trouvé:', receiver);
+                    return false;
+                }
+    
+                let socketReceiver = connectedUsers.find(element => element.pseudo === user.pseudo);
+                if (socketReceiver) {
+                    socketReceiver.emit('whisper', { sender: socket.pseudo, message: message });
+                }
+    
+                var chat = new Chat();
+                chat.sender = socket.pseudo;
+                chat.receiver = receiver;
+                chat.content = message;
+                await chat.save();
+            }
+        } catch (error) {
+            console.error('Erreur lors de l\'enregistrement du nouveau message:', error);
         }
-        socket.broadcast.emit('quitUser', socket.pseudo);
-    })
+    });
+    
+
+    // Quand un user se déconnecte
+    socket.on('disconnect', () => {
+        var index = connectedUsers.indexOf(socket)
+        if(index > -1) {
+            connectedUsers.splice(index, 1)
+        }
+        socket.broadcast.to(socket.channel).emit('quitUser', socket.pseudo);
+    });
+
+    socket.on('writting', (pseudo) => {
+        socket.broadcast.to(socket.channel).emit('writting', pseudo);
+    });
+
+    socket.on('notWritting', (pseudo) => {
+        socket.broadcast.to(socket.channel).emit('notWritting', pseudo);
+    });
+
+
+    async function _joinRoom(channelParam) {
+        try {
+            // Si l'utilisateur est déjà dans un canal, stockez-le
+            let previousChannel = socket.channel || '';
+    
+            // Quittez tous les canaux et rejoignez le canal ciblé
+            socket.leaveAll();
+            socket.join(channelParam);
+            socket.channel = channelParam;
+    
+            let channel = await Room.findOne({ name: socket.channel }).exec();
+            if (channel) {
+                let messages = await Chat.find({ _id_room: socket.channel }).exec();
+                if (!messages) {
+                    console.log('Aucun message trouvé pour', socket.pseudo);
+                } else {
+                    socket.emit('oldMessages', messages, socket.pseudo);
+                    // Si l'utilisateur vient d'un autre canal, on le fait passer, sinon on ne fait passer que le nouveau
+                    if (previousChannel) {
+                        socket.emit('emitChannel', { previousChannel: previousChannel, newChannel: socket.channel });
+                    } else {
+                        socket.emit('emitChannel', { newChannel: socket.channel });
+                    }
+                }
+            } else {
+                let room = new Room({ name: socket.channel });
+                await room.save();
+                socket.broadcast.emit('newChannel', socket.channel);
+                socket.emit('emitChannel', { previousChannel: previousChannel, newChannel: socket.channel });
+            }
+        } catch (error) {
+            console.error('Erreur lors de la recherche ou de la sauvegarde du canal :', error);
+        }
+    }
+    
+    
+
 });
 
-// Démarre le serveur HTTP sur le port 8080
-server.listen(8080, () => console.log('!!!! server started port: 8080 !!!!'));
+
+//On dit à Node de se lancer sur le port 8080
+server.listen(8080, () => console.log('Server started at port : 8080'));

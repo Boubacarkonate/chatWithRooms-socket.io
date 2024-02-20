@@ -1,196 +1,211 @@
-// Connexion au serveur Socket.IO
-let socket = io.connect('http://localhost:8080');
+// On connecte le fichier au serveur
+var socket = io.connect('http://localhost:8080');
 
-let pseudo; // Déclaration de la variable qui stockera le pseudo de l'utilisateur
 
-// Utilisation d'une boucle do...while pour demander le pseudo à l'utilisateur
-do {
-    pseudo = prompt('Quel est ton nom ?'); // Demande à l'utilisateur de saisir un pseudo
-} while (!pseudo); // La boucle continue jusqu'à ce que l'utilisateur saisisse un pseudo valide
-
-console.log('Pseudo choisi :', pseudo); // Affichage du pseudo choisi dans la console
-
-// Envoi du pseudo au serveur via Socket.IO
+// On demande le pseudo de la personne
+while(!pseudo) {
+    var pseudo = prompt('quel est ton nom ?');
+}
 socket.emit('pseudo', pseudo);
-
 socket.emit('oldWhispers', pseudo);
-
-// Mise à jour du titre du document pour inclure le pseudo choisi
 document.title = pseudo + ' - ' + document.title;
 
 
-document.getElementById('chatForm').addEventListener('submit', (e) => {
+// Quand on soumet le formulaire
+document.getElementById('chatForm').addEventListener('submit', (e)=>{
 
     e.preventDefault();
-console.log('formulaire ok');
 
+    // On récupère la valeur dans l'input et on met le input a 0
     const textInput = document.getElementById('msgInput').value;
     document.getElementById('msgInput').value = '';
 
+    // On récupère le destinataire du message
     const receiver = document.getElementById('receiverInput').value;
 
-    if (textInput.length > 0) {
+    // Si la valeur > 0, on envoie un message au serveur contenant la valeur de l'input 
+    if(textInput.length > 0) {
+
         socket.emit('newMessage', textInput, receiver);
-        if (receiver === 'all') {
+
+        if(receiver === "all") {
             createElementFunction('newMessageMe', textInput);
-            console.log('message envoyé');
         }
-        
+
     } else {
         return false;
     }
+
 });
 
 
-
-                            //Ecouteur d'événement
-
-/*
-Lorsqu'un nouvel utilisateur rejoint le chat, cet événement est écouté côté client. Lorsque cet 
-événement est reçu, la fonction createElementFunction est appelée pour créer un élément HTML représentant l'arrivée 
-de ce nouvel utilisateur.
-*/
-
-
-
-// Écouteur d'événement pour l'arrivée d'un nouvel utilisateur déclenché lorsque le serveur émet l'événement 'newUser' avec le pseudo de nouvel utilisateur.
+// On attends l'emission 'newUser' du serveur, si il est reçu on ajoute un message 
+// contenant les informations emises par le serveur, et ajoutant le user à la liste des users
 socket.on('newUser', (pseudo) => {
-    // Lorsqu'un nouvel utilisateur rejoint le chat, cette fonction est appelée
-    // Elle crée un nouvel élément HTML pour afficher l'arrivée de ce nouvel utilisateur
     createElementFunction('newUser', pseudo);
 });
-
-
-socket.on('newUserInDb', (pseudo) => {
-    newOptions = document.createElement('option');
-    newOptions.textContent = pseudo;
-    newOptions.value = pseudo;
-    document.getElementById('receiverInput').appendChild(newOptions);
-});
-
-
 socket.on('oldWhispers', (messages) => {
-    messages.forEach((message) => {
+    messages.forEach(message => {
         createElementFunction('oldWhispers', message);
     });
 })
+socket.on('newUserInDb', (pseudo) => {
+    newOption = document.createElement('option');
+    newOption.textContent = pseudo;
+    newOption.value = pseudo;
+    document.getElementById('receiverInput').appendChild(newOption);
+})
 
-// Écouteur d'événement pour la réception d'un nouveau message déclenché lorsque le serveur émet l'événement 'newMessageAll' avec le contenu du message.
-socket.on('newMessageAll', (content) => {
-    // Lorsqu'un nouveau message est reçu, cette fonction est appelée
-    // Elle crée un nouvel élément HTML pour afficher le message dans l'interface utilisateur
-    createElementFunction('newMessageAll', content);
+// On check si le user se déconnecte
+socket.on('quitUser', (message) => {
+    createElementFunction('quitUser', message);
 });
 
+
+// On attend un nouveau message
+socket.on('newMessageAll', (content) => {
+    createElementFunction('newMessageAll', content);
+});
+// On attend un message privé
 socket.on('whisper', (content) => {
     createElementFunction('whisper', content);
 });
 
 
-socket.on('oldMessages', (messages) => {
+// Une personne est en train d'ecrire
+socket.on('writting', (pseudo) => {
+    document.getElementById('isWritting').textContent = pseudo + ' est en train d\'écrire';
+});
+// Elle a arrêté d'ecrire
+socket.on('notWritting', (pseudo) => {
+    document.getElementById('isWritting').textContent = '';
+});
+
+
+// On attend que le user change de channel
+socket.on('emitChannel', (channel) => {
+    if(channel.previousChannel) {    
+        document.getElementById(channel.previousChannel).classList.remove('inChannel')
+    }
+    document.getElementById(channel.newChannel).classList.add('inChannel')
+});
+// On attend qu'un nouveau channel soit créé
+socket.on('newChannel', (newChannel) => {
+    createChannel(newChannel)
+});
+// On attend que le serveur demande les anciens messages du channel
+socket.on('oldMessages', (messages, user) => {
     messages.forEach(message => {
-        if (message.sender === pseudo) {
-            createElementFunction('oldMessagesMe', message); // Ajout d'une virgule entre 'oldMessagesMe' et msg
-            console.log('message visible');
+        if(message.sender === user) {
+            createElementFunction('oldMessagesMe', {sender: message.sender, content: message.content});
         } else {
-            createElementFunction('oldMessages', message); // Ajout d'une virgule entre 'oldMessages' et msg
-            console.log('msg non visible');
+            createElementFunction('oldMessages', {sender: message.sender, content: message.content});
         }
     });
 });
 
-// Écouteur d'événement déclenché lorsque le serveur émet l'événement 'writting' avec le pseudo de l'utilisateur qui est en train d'écrire.
-socket.on('writting', (pseudo) => {
-    // Lorsque le serveur émet l'événement 'writting', cette fonction est appelée
-    // Elle met à jour l'élément HTML avec l'ID 'isWritting' pour afficher que l'utilisateur est en train d'écrire
-    document.getElementById('isWritting').textContent = pseudo + " est en train d'écrire";
-});
 
-// Écouteur d'événement pour indiquer qu'un utilisateur a cessé d'écrire. Il est déclenché lorsque le serveur émet l'événement 'notWritting'.
-socket.on('notWritting', () => {
-    // Lorsque le serveur émet l'événement 'notWritting', cette fonction est appelée
-    // Elle efface le texte indiquant que l'utilisateur est en train d'écrire de l'élément HTML avec l'ID 'isWritting'
-    document.getElementById('isWritting').textContent = '';
-});
-
-// Écouteur d'événement déclenché lorsque le serveur émet l'événement 'quitUser' avec le pseudo de l'utilisateur qui quitte le chat.
-socket.on('quitUser', (pseudo) => {
-    // Lorsqu'un utilisateur quitte le chat, cette fonction est appelée
-    // Elle crée un nouvel élément HTML pour afficher le départ de cet utilisateur dans l'interface utilisateur
-    createElementFunction('quitUser', pseudo);
-});
-
-
-                            //funtion
-
-/*
-Cette fonction crée un nouvel élément HTML en fonction de l'élément passé en paramètre. Dans ce cas, elle crée un 
-message indiquant qu'un nouvel utilisateur a rejoint le chat. Cet élément est ensuite ajouté à un conteneur dans 
-l'interface utilisateur.
-*/ 
-
+// S'il ecrit on emet 'writting' au serveur
 function writting() {
     socket.emit('writting', pseudo);
 }
 
+// S'il ecrit plus on emet 'notWritting' au serveur
 function notWritting() {
-    socket.emit('notWritting');
+    socket.emit('notWritting', pseudo);
 }
 
 
-function createElementFunction(element, content){
+function createElementFunction(element, content) {
+    
+    const newElement = document.createElement("div");
 
-    const newElement = document.createElement('div');
-
-    switch (element) {
-        case 'newUser':
-                newElement.classList.add(element, 'message')
-                newElement.textContent = content + ' a rejoint le chat';
-                document.getElementById('msgContainer').appendChild(newElement);
-            break;
+    switch(element){
 
         case 'newMessageMe':
-                newElement.classList.add(element, 'message')
-                newElement.innerHTML = pseudo + ' : ' + content;
-                document.getElementById('msgContainer').appendChild(newElement);
+            newElement.classList.add(element, 'message');
+            newElement.innerHTML = pseudo + ': ' + content;
+            document.getElementById('msgContainer').appendChild(newElement);
             break;
-
+            
+            
         case 'newMessageAll':
-                newElement.classList.add(element, 'message')
-                newElement.innerHTML = content.pseudo + ' : ' + content.message;
-                document.getElementById('msgContainer').appendChild(newElement);
+            newElement.classList.add(element, 'message');
+            newElement.innerHTML = content.pseudo + ': ' + content.message;
+            document.getElementById('msgContainer').appendChild(newElement);
             break;
 
         case 'whisper':
-                newElement.classList.add(element, 'message')
-                newElement.innerHTML = content.sender + ' vous a chuchoté : ' + content.message;
-                document.getElementById('msgContainer').appendChild(newElement);
+            newElement.classList.add(element, 'message');
+            newElement.textContent = content.sender + ' vous chuchote: ' + content.message;
+            document.getElementById('msgContainer').appendChild(newElement);
             break;
 
-        case 'oldMessages':
-                newElement.classList.add(element, 'message');
-                newElement.innerHTML = content.sender + ': ' + content.content;
-                document.getElementById('msgContainer').appendChild(newElement);
-            break;
-
-            case 'oldMessagesMe':
-                newElement.classList.add('newMessageMe', 'message');
-                newElement.innerHTML = content.sender + ': ' + content.content;
-                document.getElementById('msgContainer').appendChild(newElement);
-            break;
-
-        case 'oldWhispers':
-                newElement.classList.add(element, 'message');
-                newElement.innerHTML = content.sender + ' vous a chuchoté : ' + content.content;
-                document.getElementById('msgContainer').appendChild(newElement);
+        case 'newUser':
+            newElement.classList.add(element, 'message');
+            newElement.textContent = content + ' a rejoint le chat';
+            document.getElementById('msgContainer').appendChild(newElement);
             break;
 
         case 'quitUser':
-                newElement.classList.add(element, 'message')
-                newElement.textContent = content + ' a quitté le chat';
-                document.getElementById('msgContainer').appendChild(newElement);
-    
-        default:
+            newElement.classList.add(element, 'message');
+            newElement.textContent = content + ' a quitté le chat';
+            document.getElementById('msgContainer').appendChild(newElement);
             break;
+
+        case 'oldMessages':
+            newElement.classList.add(element, 'message');
+            newElement.innerHTML = content.sender + ': ' + content.content;
+            document.getElementById('msgContainer').appendChild(newElement);
+            break;
+
+        case 'oldMessagesMe':
+            newElement.classList.add('newMessageMe', 'message');
+            newElement.innerHTML = content.sender + ': ' + content.content;
+            document.getElementById('msgContainer').appendChild(newElement);
+        break;
+
+        case 'oldWhispers':
+            newElement.classList.add(element, 'message');
+            newElement.textContent = content.sender + ' vous chuchote: ' + content.content;
+            document.getElementById('msgContainer').appendChild(newElement);
+            break;
+
     }
+}
+
+function createChannel(newRoom) {
+    // Vérifie si la room existe déjà dans la liste
+    if (!document.getElementById(newRoom)) {
+        const newRoomItem = document.createElement("li");
+        newRoomItem.classList.add('elementList');
+        newRoomItem.id = newRoom;
+        newRoomItem.textContent = newRoom;
+        newRoomItem.setAttribute('onclick', "_joinRoom('" + newRoom + "')");
+        document.getElementById('roomList').insertBefore(newRoomItem, document.getElementById('createNewRoom'));
+    }
+}
+
+
+function _joinRoom(channel){
+  
+    // On réinitialise les messages
+    document.getElementById('msgContainer').innerHTML = "";
+
+    // On émet le changement de room
+    socket.emit('changeChannel', channel);
+
+    
+}
+
+
+function _createRoom(){
+    while(!newRoom){
+        var newRoom = prompt('Quel est le nom de la nouvelle Room ?');
+    }
+    
+    createChannel(newRoom);
+
+    _joinRoom(newRoom);
+
 }
