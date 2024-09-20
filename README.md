@@ -22,7 +22,10 @@ Création d'un chat avec Socket.io avec des rooms et une base de données
 ### démarrer le serveur
     node server.js
    
-  
-  ![Capture d’écran (768)_640x339](https://github.com/user-attachments/assets/1da6f581-eb92-4682-8099-145fcdee808f) 
+## Illustration de l'application 
+![Capture d’écran (767)_640x310](https://github.com/user-attachments/assets/87257336-7810-4ae4-a2e5-95c55a3ccaf1)
+
+
+![Capture d’écran (768)_640x339](https://github.com/user-attachments/assets/1da6f581-eb92-4682-8099-145fcdee808f) 
 
 
