@@ -175,15 +175,14 @@ function createElementFunction(element, content) {
 }
 
 function createChannel(newRoom) {
-    // Vérifie si la room existe déjà dans la liste
-    if (!document.getElementById(newRoom)) {
-        const newRoomItem = document.createElement("li");
-        newRoomItem.classList.add('elementList');
-        newRoomItem.id = newRoom;
-        newRoomItem.textContent = newRoom;
-        newRoomItem.setAttribute('onclick', "_joinRoom('" + newRoom + "')");
-        document.getElementById('roomList').insertBefore(newRoomItem, document.getElementById('createNewRoom'));
-    }
+
+    const newRoomItem = document.createElement("li");
+    newRoomItem.classList.add('elementList');
+    newRoomItem.id = newRoom;
+    newRoomItem.textContent = newRoom;
+    newRoomItem.setAttribute('onclick', "_joinRoom('" + newRoom + "')")
+    document.getElementById('roomList').insertBefore(newRoomItem, document.getElementById('createNewRoom'));
+
 }
 
 

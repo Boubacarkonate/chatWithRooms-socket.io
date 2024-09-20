@@ -18,5 +18,8 @@ Création d'un chat avec Socket.io avec des rooms et une base de données
 
 ### installation des dépendances : express, mongoose, nodemon, ejs et socket.io
     npm i express mongoose nodemon ejs socket.io
+
+### démarrer le serveur
+    node server.js
    
     
