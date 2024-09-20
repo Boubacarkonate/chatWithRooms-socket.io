@@ -1,5 +1,5 @@
 # Chat-Room
-Création d'un chat avec Socket.io avec des rooms et une base de données
+Création d'un chat Socket.io avec des rooms et une base de données MongoDB
 ## technologies 
     - javascripts
     - nodejs
